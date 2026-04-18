@@ -70,18 +70,46 @@ def extract_skills(text):
     
     return found_skills
 
+import re
+
+def clean_words(s):
+    return re.findall(r"\b[a-zA-Z]+\b", s.lower())
+
 def match_score(resume_text, job_desc):
-    resume_text = resume_text.lower()
-    job_desc = job_desc.lower()
+    r = set(clean_words(resume_text))
+    j = set(clean_words(job_desc))
 
-    match_count = 0
+    if not j:
+        return 0.0
 
-    for word in job_desc.split():
-        if word in resume_text:
-            match_count += 1
+    return round(len(r & j) / len(j) * 100, 2)
 
-    score = (match_count / len(job_desc.split())) * 100
-    return round(score, 2)
+#AI feedback
+
+def ai_feedback(skills, score):
+    feedback = []
+
+    if score < 40:
+        feedback.append("Your resume is weak. Add more technical skills and projects.")
+
+    elif score < 70:
+        feedback.append("Your resume is average. Improve it by adding more relevant skills and experience.")
+
+    else:
+        feedback.append("Your resume looks strong. Focus on advanced skills and real-world projects.")
+
+    if "machine learning" not in skills:
+        feedback.append("Consider adding Machine Learning projects to stand out.")
+
+    if "python" not in skills:
+        feedback.append("Python is highly recommended for tech roles.")
+
+    if len(skills) < 3:
+        feedback.append("Add more skills to strengthen your profile.")
+
+    return feedback
+
+    
 
 #upload resume
 
@@ -98,65 +126,109 @@ def extract_text(file):
     text = ""
 
     for page in reader.pages:
-        text += page.extract_text()
+        page_text = page.extract_text() or ""
+        text += page_text
 
     return text
 
-if uploaded_file is not None:
+#Empty file check
+
+# Empty file check
+if uploaded_file is None:
+    st.info("Please upload a PDF resume.")
+    st.stop()
+
+if uploaded_file:
     st.success("File uploaded successfully!")
 
-    text = extract_text(uploaded_file)
-    skills = extract_skills(text)
+# text extract
+text = extract_text(uploaded_file)
 
-    if not skills:
-        st.warning("⚠ No skills detected. Improve your resume!")
+# IMPORTANT CHECK
+if not text.strip():
+    st.error("⚠ Could not extract text from PDF.")
+    st.stop()
 
+# skills extraction
+skills = sorted(list(set(extract_skills(text))))
 
-    st.subheader("💡 Extracted Skills:")
-    st.write(skills)
-    st.subheader("📌 Total Skills Found:")
-    st.write(len(skills))
-
-    st.subheader("📄 Extracted Text (Preview):")
-    st.write(text[:500])
-
-    #score section
-
-    score, max_score = calculate_score(skills)
-    percentage = (score / max_score) * 100 if max_score != 0 else 0
-
-    st.subheader("📊 Resume Score:")
-    st.success(f"{score} / {max_score} ({round(percentage,2)}%)")
-    st.progress(int(percentage))
+if not skills:
+    st.warning("⚠ No skills detected. Improve your resume!")
 
 
-    role = predict_role(skills)
-    st.subheader("🎯 Predicted Job Role:")
-    st.success(role)
+st.subheader("💡 Extracted Skills:")
+st.write(skills)
+st.subheader("📌 Total Skills Found:")
+st.write(len(skills))
 
-    if job_desc:
-        match = match_score(text, job_desc)
-        st.subheader("📊 Resume vs Job Match Score:")
-        st.success(f"{match}% match")
+st.subheader("📄 Extracted Text (Preview):")
+st.write(text[:500])
+
+#score section
+
+score, max_score = calculate_score(skills)
+percentage = (score / max_score) * 100 if max_score != 0 else 0
+
+st.subheader("📊 Resume Score:")
+st.success(f"{score} / {max_score} ({round(percentage,2)}%)")
+st.progress(min(int(percentage), 100))
+st.caption(f"Score out of {max_score}")
     
-    #bar chart visualization
+#role prediction
 
-    data = pd.DataFrame({
-        "Skills": skills,
-        "Count": [1]*len(skills)
-    })
+role = predict_role(skills)
+st.subheader("🎯 Predicted Job Role:")
+st.success(role)
 
+#Job Description
+
+if job_desc.strip():
+    match = match_score(text, job_desc)
+    st.subheader("📊 Resume vs Job Match Score:")
+    st.success(f"{match}% match")
+else:
+    st.warning("Paste a job description to get match score.")
     
-    st.subheader("📊 Skills Visualization:")
-    st.bar_chart(data.set_index("Skills"))
+#bar chart visualization
 
-    suggestions = give_suggestions(skills)
-    st.subheader("📌 Suggestions:")
+data = pd.DataFrame({
+    "Skills": skills,
+    "Count": [1]*len(skills)
+})
 
-    if not suggestions:
-        st.success("✅ Your resume looks strong!")
-    else:
-        for s in suggestions:
-            st.markdown(f"👉 **{s}**")
+st.subheader("📊 Skills Visualization:")
+st.bar_chart(data.set_index("Skills"))
+
+
+#suggestions
+
+suggestions = give_suggestions(skills)
+feedback = ai_feedback(skills, score)
+st.subheader("📌 Suggestions:")
+    
+if not suggestions:
+    st.success("✅ Your resume looks strong!")
+else:
+    for s in suggestions:
+        st.markdown(f"👉 **{s}**")
+
+import io
+buf = io.StringIO()
+buf.write("\n".join(suggestions) if suggestions else "Your resume looks strong!")
+        
+st.download_button(
+    "📥 Download Suggestions",
+    buf.getvalue(),
+    "suggestions.txt"
+)
+
+st.subheader("🤖 AI Resume Feedback:")
+
+for f in feedback:
+    st.markdown(f"- {f}")
+
+
+
+
  
 
