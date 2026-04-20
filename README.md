@@ -27,7 +27,7 @@ AI Resume Analyzer is designed to help users evaluate and improve their resumes 
 
 ## Live Demo
 
-https://resume-analyzer-47ppj4jkre5nws8dczclak.streamlit.app
+https://ai-resume-analyzer-18042026.streamlit.app
 
 ## How It Works
 
